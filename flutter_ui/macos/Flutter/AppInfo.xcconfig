@@ -1,0 +1,3 @@
+PRODUCT_NAME = vector_search_ui
+PRODUCT_BUNDLE_IDENTIFIER = com.example.vectorSearchUi
+PRODUCT_COPYRIGHT = Copyright © 2026. All rights reserved.

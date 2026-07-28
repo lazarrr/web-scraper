@@ -1,0 +1,117 @@
+{
+  "info": {
+    "name": "Vector Search API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// ── Status code ──────────────────────────",
+              "pm.test(\"Status is 200\", () => {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// ── Response body checks ─────────────────",
+              "pm.test(\"Response has status field\", () => {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"status\");",
+              "    pm.expect(json.status).to.eql(\"healthy\");",
+              "});",
+              "",
+              "pm.test(\"Response has document_count field\", () => {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"document_count\");",
+              "    pm.expect(json.document_count).to.be.a(\"number\");",
+              "});",
+              "",
+              "// ── Response time ────────────────────────",
+              "pm.test(\"Response time < 500ms\", () => {",
+              "    pm.expect(pm.response.responseTime).to.be.below(500);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8001/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8001",
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Similarity Search",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// ── Status code ──────────────────────────",
+              "pm.test(\"Status is 200\", () => {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// ── Response shape ───────────────────────",
+              "pm.test(\"Response has expected fields\", () => {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"query\");",
+              "    pm.expect(json).to.have.property(\"total_results\");",
+              "    pm.expect(json).to.have.property(\"results\");",
+              "    pm.expect(json.results).to.be.an(\"array\");",
+              "});",
+              "",
+              "// ── Each result has required fields ───────",
+              "pm.test(\"Each result has document, metadata, distance, similarity\", () => {",
+              "    const results = pm.response.json().results;",
+              "    results.forEach((r, i) => {",
+              "        pm.expect(r, `result[${i}]`).to.include.all.keys(",
+              "            \"document\", \"metadata\", \"distance\", \"similarity\"",
+              "        );",
+              "        pm.expect(r.similarity, `result[${i}] similarity`).to.be.within(0, 1);",
+              "        pm.expect(r.distance, `result[${i}] distance`).to.be.a(\"number\");",
+              "    });",
+              "});",
+              "",
+              "// ── Response time ────────────────────────",
+              "pm.test(\"Response time < 5s\", () => {",
+              "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"upis na fakultet\",\n    \"k\": 5\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8001/search",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8001",
+          "path": ["search"]
+        }
+      }
+    }
+  ]
+}

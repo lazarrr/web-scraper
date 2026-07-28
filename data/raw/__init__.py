@@ -1,0 +1,1 @@
+# university-scraper data package

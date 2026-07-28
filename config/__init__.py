@@ -1,0 +1,1 @@
+# university-scraper config package

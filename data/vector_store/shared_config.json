@@ -1,0 +1,9 @@
+{
+  "collection_name": "university_knowledge",
+  "embedding_model": "intfloat/multilingual-e5-large",
+  "embedding_device": "cpu",
+  "normalize_embeddings": true,
+  "query_prefix": "query: ",
+  "passage_prefix": "passage: ",
+  "hnsw_space": "cosine"
+}
