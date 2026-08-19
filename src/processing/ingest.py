@@ -1,11 +1,11 @@
 """
 ingest.py
-~~~~~~~~~
+~~~~~~~~
 Connects the crawler + extractor output to your existing ChromaDB pipeline.
 
 Flow:
   1. Receive (text, metadata) pairs from the extractor
-  2. Chunk with sliding window (reuses settings.CHUNK_SIZE / CHUNK_OVERLAP)
+  2. Chunk with the configured strategy (fixed_size / semantic / header_based)
   3. Generate content-hashed IDs for deduplication
   4. Prefix with "passage: " (as required by multilingual-e5-large)
   5. Upsert into ChromaDB
@@ -16,10 +16,10 @@ from __future__ import annotations
 import hashlib
 import time
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document as LCDocument
 
 from src.core.vector_store import VectorStoreManager
+from src.core.chunking import make_splitter
 from src.processing.crawler import DomainCrawler, CrawledURL
 from src.processing.extractor import ResourceExtractor
 from src.processing.crawl_history import CrawlHistoryManager
@@ -27,7 +27,7 @@ from src.processing.crawl_history import CrawlHistoryManager
 
 class IngestionPipeline:
     """
-    Crawl → Extract → Chunk → Embed → Upsert pipeline.
+    Crawl -> Extract -> Chunk -> Embed -> Upsert pipeline.
     """
 
     def __init__(
@@ -35,6 +35,7 @@ class IngestionPipeline:
         vector_store: VectorStoreManager,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
+        chunk_strategy: str = "fixed_size",
         max_depth: int = 3,
         delay: float = 1.0,
         timeout: int = 15,
@@ -45,6 +46,7 @@ class IngestionPipeline:
         self.vector_store = vector_store
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.chunk_strategy = chunk_strategy
         self.max_depth = max_depth
         self.delay = delay
         self.timeout = timeout
@@ -52,15 +54,14 @@ class IngestionPipeline:
         self.crawler_exclude_patterns = crawler_exclude_patterns
         self.crawl_history = crawl_history
 
-        self._splitter = RecursiveCharacterTextSplitter(
+        self._splitter = make_splitter(
+            strategy=chunk_strategy,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            length_function=len,
-            separators=["\n\n", "\n", ". ", " ", ""],
         )
 
     # ------------------------------------------------------------------ #
-    #  Ingest from a single base URL                                        #
+    #  Ingest from a single base URL                                      #
     # ------------------------------------------------------------------ #
 
     def ingest_from_url(self, base_url: str) -> int:
@@ -72,7 +73,7 @@ class IngestionPipeline:
         """
         total_chunks = 0
 
-        # ── Step 1: Crawl ──────────────────────────────────────────── #
+        # -- Step 1: Crawl --------------------------------------------- #
         print(f"\n=== Crawling: {base_url} ===")
         crawler = DomainCrawler(
             base_url=base_url,
@@ -89,7 +90,7 @@ class IngestionPipeline:
             print("No extractable URLs found.")
             return 0
 
-        # ── Filter out already-ingested URLs ───────────────────────── #
+        # -- Filter out already-ingested URLs -------------------------- #
         skipped_already: list[CrawledURL] = []
         new_urls: list[CrawledURL] = []
         if self.crawl_history:
@@ -106,10 +107,10 @@ class IngestionPipeline:
             new_urls = extractable
 
         if not new_urls:
-            print("All URLs already ingested — nothing to do.")
+            print("All URLs already ingested -- nothing to do.")
             return 0
 
-        # ── Step 2: Extract + Chunk + Upsert ───────────────────────── #
+        # -- Step 2: Extract + Chunk + Upsert -------------------------- #
         print(f"\n=== Extracting {len(new_urls)} resources ===")
         extractor = ResourceExtractor(timeout=self.timeout)
 
@@ -122,14 +123,14 @@ class IngestionPipeline:
 
             text, meta = extracted
             if not text.strip():
-                print(f"  No text extracted — skipping")
+                print(f"  No text extracted -- skipping")
                 continue
 
-            # Chunk the extracted text
+            # Chunk the extracted text with the configured strategy
             chunks = self._splitter.create_documents(
                 [text], metadatas=[meta]
             )
-            print(f"  → {len(chunks)} chunks")
+            print(f"  -> {len(chunks)} chunks  (strategy: {self.chunk_strategy})")
 
             # Upsert into ChromaDB
             if chunks:
@@ -146,7 +147,7 @@ class IngestionPipeline:
             if self.delay > 0 and i < len(new_urls):
                 time.sleep(self.delay)
 
-        # ── Save crawl history ──────────────────────────────────────── #
+        # -- Save crawl history ---------------------------------------- #
         if self.crawl_history:
             self.crawl_history.save()
 
@@ -154,7 +155,7 @@ class IngestionPipeline:
         return total_chunks
 
     # ------------------------------------------------------------------ #
-    #  Ingest from a list of pre-crawled URLs                               #
+    #  Ingest from a list of pre-crawled URLs                             #
     # ------------------------------------------------------------------ #
 
     def ingest_from_url_list(self, crawled_urls: list[CrawledURL]) -> int:
@@ -169,7 +170,7 @@ class IngestionPipeline:
 
         Returns
         -------
-        int — total chunks upserted.
+        int -- total chunks upserted.
         """
         total_chunks = 0
         extractor = ResourceExtractor(timeout=self.timeout)
@@ -198,13 +199,9 @@ class IngestionPipeline:
         return total_chunks
 
     # ------------------------------------------------------------------ #
-    #  Upsert helper (reuses VectorStoreManager pattern)                    #
+    #  Upsert helper (reuses VectorStoreManager pattern)                  #
     # ------------------------------------------------------------------ #
 
     def _upsert_chunks(self, chunks: list[LCDocument]) -> None:
         """Add chunks to the vector store using the existing add_documents API."""
-        # VectorStoreManager.add_documents handles:
-        #   • passage: prefix via create_embeddings(is_query=False)
-        #   • content-hashed IDs via _content_id()
-        #   • chromadb upsert (idempotent)
         self.vector_store.add_documents(chunks)

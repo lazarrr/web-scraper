@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
+    CHUNK_STRATEGY: str = "fixed_size"
 
     # ------------------------------------------------------------------ #
     #  Crawler                                                             #
@@ -59,6 +60,29 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"
     EMBEDDING_DEVICE: str = "cpu"
+
+    # ------------------------------------------------------------------ #
+    #  Hybrid search (dense + BM25 sparse)                                 #
+    # ------------------------------------------------------------------ #
+    HYBRID_SEARCH_ENABLED: bool = True
+    HYBRID_CANDIDATE_COUNT: int = 20
+    RRF_K: int = 60
+    RRF_DENSE_WEIGHT: float = 0.5
+    RRF_SPARSE_WEIGHT: float = 0.5
+
+    # ------------------------------------------------------------------ #
+    #  Cross-encoder reranking                                             #
+    # ------------------------------------------------------------------ #
+    RERANKER_ENABLED: bool = True
+    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    RERANKER_DEVICE: str = "cpu"
+    RERANKER_MAX_LENGTH: int = 512
+    RERANKER_TOP_K: int = 5
+
+    # ------------------------------------------------------------------ #
+    #  Similarity threshold                                                #
+    # ------------------------------------------------------------------ #
+    SIMILARITY_THRESHOLD: float = 0.0
 
     class Config:
         env_file = ".env"

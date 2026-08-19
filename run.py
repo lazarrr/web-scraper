@@ -86,6 +86,7 @@ def main() -> None:
         vector_store=vector_store,
         chunk_size=settings.CHUNK_SIZE,
         chunk_overlap=settings.CHUNK_OVERLAP,
+        chunk_strategy=settings.CHUNK_STRATEGY,
         max_depth=settings.CRAWLER_MAX_DEPTH,
         delay=settings.CRAWLER_DELAY,
         timeout=settings.CRAWLER_TIMEOUT,

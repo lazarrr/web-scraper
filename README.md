@@ -60,3 +60,46 @@ environment variables or a `.env` file.  Key settings:
 | `CHUNK_SIZE` | `1000` | Character chunk size |
 | `CHUNK_OVERLAP` | `200` | Character overlap between chunks |
 | `CRAWL_HISTORY_ENABLED` | `true` | Skip already-ingested URLs |
+
+## Running the search server (API for the Flutter app)
+
+The FastAPI server in `src/api/search_server.py` exposes the vector search
+API that the Flutter app talks to.  It reads the same ChromaDB collection
+that the scraper populates, so **run the scraper first** to fill the store.
+
+```bash
+cd university-scraper
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Option A — start directly via the module entry point:
+python src/api/search_server.py
+
+# Option B — start with uvicorn explicitly:
+python -m uvicorn src.api.search_server:app --host 0.0.0.0 --port 8001
+```
+
+The server listens on `http://0.0.0.0:8001` and exposes:
+
+- `POST /search` — hybrid (dense + BM25) search, body `{"query": "...", "k": 5}`
+- `GET /health` — health check
+
+## Running the Flutter app
+
+```bash
+cd flutter_ui
+flutter pub get
+flutter run
+```
+
+The app calls the search server at a configurable base URL (open the
+settings dialog in-app to change it).  Pick the address that matches your
+target:
+
+| Target | Base URL |
+|---|---|
+| iOS simulator / web | `http://localhost:8001` |
+| Android emulator | `http://10.0.2.2:8001` |
+| Physical device | `http://<your-machine-ip>:8001` |
+
+Make sure the search server is running before you send queries.

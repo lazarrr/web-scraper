@@ -1,5 +1,5 @@
 # university-scraper dependencies
-# ── Pinned to exact versions that match university-chatbot ──────────────
+# -- Pinned to exact versions that match university-chatbot --------------
 
 # Vector database
 chromadb>=0.4.0
@@ -25,3 +25,10 @@ pydantic-settings>=2.5.0
 
 # Data processing
 numpy>=1.24.0
+
+# Search server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+
+# BM25 sparse retrieval for hybrid search
+rank-bm25>=0.2.0
