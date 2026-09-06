@@ -208,6 +208,22 @@ class VectorStoreManager:
 
         ids = [self._content_id(t) for t in texts]
 
+        # ChromaDB upsert requires unique ids within a single call.  Duplicate
+        # chunk text (mixed-script pages yield byte-identical Latin/ASCII
+        # variants) would otherwise hash to the same id and fail the upsert,
+        # so keep only the first occurrence of each id.
+        seen: set[str] = set()
+        keep: list[int] = []
+        for idx, doc_id in enumerate(ids):
+            if doc_id not in seen:
+                seen.add(doc_id)
+                keep.append(idx)
+
+        texts = [texts[i] for i in keep]
+        embeddings = embeddings[keep]
+        metadata = [metadata[i] for i in keep]
+        ids = [ids[i] for i in keep]
+
         collection.upsert(
             embeddings=embeddings.tolist(),
             documents=texts,

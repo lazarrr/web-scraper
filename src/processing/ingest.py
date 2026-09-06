@@ -188,6 +188,7 @@ class IngestionPipeline:
             variants = [(text, "original", _script_of(text))]
 
         chunks: list[LCDocument] = []
+        seen: set[str] = set()
         for variant_text, variant_name, script in variants:
             variant_meta = {
                 **meta,
@@ -197,7 +198,15 @@ class IngestionPipeline:
             chunked = self._splitter.create_documents(
                 [variant_text], metadatas=[variant_meta]
             )
-            chunks.extend(chunked)
+            for doc in chunked:
+                # Mixed-script pages produce byte-identical chunks across
+                # variants (already-Latin text is unchanged by the
+                # Cyrillic->Latin transliteration).  Drop duplicates so
+                # the vector-store upsert never sees colliding IDs.
+                if doc.page_content in seen:
+                    continue
+                seen.add(doc.page_content)
+                chunks.append(doc)
         return chunks
 
     # ------------------------------------------------------------------ #
