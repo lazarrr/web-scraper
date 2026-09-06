@@ -1,137 +1,126 @@
 """
 crawler.py
 ~~~~~~~~~~
-Domain-scoped web crawler that discovers all reachable URLs from a base URL.
+Seed-driven crawler for the urls.json scrape plan.
 
-Features
---------
-• Stays within the same domain (no external links)
-• Respects robots.txt via urllib.robotparser
-• Classifies each discovered URL: html, pdf, docx, or skip
-• Maintains a visited set to avoid cycles
-• Configurable depth limit and politeness delay between requests
-• URL path filtering via include/exclude regex patterns
+Unlike a classic BFS crawler it does NOT start from a homepage and
+follow everything.  It starts from the concrete seed list expanded by
+source_plan.py (HTML pages, staff profiles, Moodle catalogue pages) and
+follows links only within the allowed hosts, up to a per-seed depth
+limit.
 
-Output: list[CrawledURL] — each with .url, .type, .depth
+Every discovered link passes through url_rules.normalize_url() and the
+denylist BEFORE it is queued.  That is what keeps the frontier finite
+on a site where arbitrary query strings return HTTP 200 with identical
+content and where ?start= / ?limitstart= are silent no-ops.
+
+Output: list[CrawledURL] — each with .url, .type, .depth, .seed_id.
 """
 
 from __future__ import annotations
 
 import re
 import time
+from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 from collections import deque
-from dataclasses import dataclass
 
 import requests
 from bs4 import BeautifulSoup
 
+from src.processing.source_plan import ScrapePlan, SeedSpec
+from src.processing.url_rules import (
+    Denylist,
+    build_host_allowlist,
+    is_host_allowed,
+    normalize_url,
+)
+
+# URL schemes that are never crawled / queued.
+_BLOCKED_SCHEMES: frozenset[str] = frozenset(
+    {"mailto", "tel", "javascript", "data", "ftp", "file"}
+)
+
 
 @dataclass
 class CrawledURL:
-    url:   str
-    type:  str   # "html" | "pdf" | "docx" | "skip"
+    url: str
+    type: str      # "html" | "pdf" | "docx" | "skip"
     depth: int
+    seed_id: str = ""
 
 
-class DomainCrawler:
-    """Recursive, breadth-first crawler for a single domain."""
+class SeedCrawler:
+    """Crawls one seed at a time, honouring the urls.json crawl rules."""
 
     EXTRACTABLE_EXTENSIONS: set[str] = {".pdf", ".docx", ".doc"}
     SKIP_EXTENSIONS: set[str] = {
         ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp",
         ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
         ".mp4", ".mp3", ".avi", ".mov", ".wmv",
-        ".css", ".js", ".json", ".xml", ".ico",
+        ".css", ".js", ".ico", ".xml",
         ".xls", ".xlsx", ".ppt", ".pptx",
         ".exe", ".msi", ".dmg", ".pkg",
     }
 
     def __init__(
         self,
-        base_url: str,
-        max_depth: int = 3,
-        delay: float = 1.0,
+        plan: ScrapePlan,
+        delay: float = 1.5,
         timeout: int = 15,
-        user_agent: str = "Mozilla/5.0 (compatible; UniversityRAGBot/1.0)",
-        include_patterns: list[str] | None = None,
-        exclude_patterns: list[str] | None = None,
+        user_agent: str | None = None,
     ):
-        self.base_url  = base_url.rstrip("/")
-        self.max_depth = max_depth
-        self.delay     = delay
-        self.timeout   = timeout
+        self.plan = plan
+        self.delay = delay
+        self.timeout = timeout
 
-        parsed = urlparse(self.base_url)
-        self.domain = parsed.netloc.lower()
-        self.scheme = parsed.scheme
+        self.denylist = Denylist(plan.denylist)
+        self.robots_disallow = [
+            p for p in plan.rules.get("robots_disallow", []) if p
+        ]
+        self.allowed_hosts = build_host_allowlist(
+            plan.meta.get("primary_host", ""),
+            plan.meta.get("secondary_hosts", []),
+        )
+        self.respect_robots = plan.respect_robots
 
         self._session = requests.Session()
-        self._session.headers.update({"User-Agent": user_agent})
+        self._session.headers.update({"User-Agent": user_agent or plan.user_agent})
 
-        self._visited: set[str] = set()
-        self._robots: RobotFileParser | None = None
-
-        # ── URL path filtering ─────────────────────────────────────── #
-        self._include_patterns = [
-            re.compile(p, re.I) for p in (include_patterns or [])
-        ]
-        self._exclude_patterns = [
-            re.compile(p, re.I) for p in (exclude_patterns or [])
-        ]
-        self._has_filters = bool(self._include_patterns or self._exclude_patterns)
+        self._robots: dict[str, RobotFileParser] = {}
+        self._fetched: set[str] = set()   # URLs fetched for link discovery
 
     # ------------------------------------------------------------------ #
     #  Robots.txt                                                          #
     # ------------------------------------------------------------------ #
 
-    def _load_robots(self) -> None:
-        """Fetch and parse robots.txt for the domain (cached)."""
-        if self._robots is not None:
-            return
-        robots_url = f"{self.scheme}://{self.domain}/robots.txt"
-        rp = RobotFileParser()
-        rp.set_url(robots_url)
-        try:
-            rp.read()
-        except Exception:
-            rp.allow_all = True
-        self._robots = rp
-
     def _is_allowed(self, url: str) -> bool:
-        self._load_robots()
-        return self._robots.can_fetch(
-            self._session.headers.get("User-Agent", "*"), url
-        )
+        parsed = urlparse(url)
 
-    # ------------------------------------------------------------------ #
-    #  URL path filtering                                                   #
-    # ------------------------------------------------------------------ #
-
-    def _is_relevant_path(self, url: str) -> bool:
-        """
-        Returns True if the URL path matches the configured include/exclude
-        patterns.  When no filters are configured, all paths pass.
-        """
-        if not self._has_filters:
-            return True
-
-        path = urlparse(url).path
-
-        # Exclude patterns always take priority
-        for pat in self._exclude_patterns:
-            if pat.search(path):
+        # Static robots_disallow prefixes from urls.json
+        for prefix in self.robots_disallow:
+            if parsed.path.startswith(prefix):
                 return False
 
-        # If include patterns are defined, at least one must match
-        if self._include_patterns:
-            for pat in self._include_patterns:
-                if pat.search(path):
-                    return True
-            return False
+        if not self.respect_robots:
+            return True
 
-        return True
+        host = parsed.netloc.lower()
+        if host not in self._robots:
+            rp = RobotFileParser()
+            rp.set_url(f"{parsed.scheme}://{host}/robots.txt")
+            try:
+                rp.read()
+            except Exception:
+                rp.allow_all = True
+            self._robots[host] = rp
+
+        ua = self._session.headers.get("User-Agent", "*")
+        try:
+            return self._robots[host].can_fetch(ua, url)
+        except Exception:
+            return True
 
     # ------------------------------------------------------------------ #
     #  URL classification                                                   #
@@ -162,81 +151,103 @@ class DomainCrawler:
     #  Link extraction                                                      #
     # ------------------------------------------------------------------ #
 
-    def _extract_links(self, html: str, current_url: str) -> list[str]:
+    @staticmethod
+    def _extract_links(html: str, current_url: str) -> list[str]:
         soup = BeautifulSoup(html, "html.parser")
         links: list[str] = []
         for tag in soup.find_all("a", href=True):
             href = tag["href"].strip()
+            if not href or href.startswith("#"):
+                continue
             absolute = urljoin(current_url, href)
-            clean = urlparse(absolute)._replace(fragment="").geturl()
-            links.append(clean)
+            parts = urlparse(absolute)
+            if parts.scheme.lower() in _BLOCKED_SCHEMES:
+                continue
+            links.append(absolute)
         return links
 
-    def _is_same_domain(self, url: str) -> bool:
-        return urlparse(url).netloc.lower() == self.domain
-
     # ------------------------------------------------------------------ #
-    #  Crawl                                                               #
+    #  Crawl one seed                                                       #
     # ------------------------------------------------------------------ #
 
-    def crawl(self) -> list[CrawledURL]:
-        """Run the BFS crawl and return all discovered URLs."""
+    def crawl_seed(self, seed: SeedSpec) -> list[CrawledURL]:
+        """
+        Crawl from a single seed URL.
+
+        The seed URL itself is always reported (even at depth 0).  HTML
+        seeds are fetched to discover further links up to the seed's
+        depth limit; PDF/DOCX links are only queued when the seed says
+        follow_pdfs.
+        """
         results: list[CrawledURL] = []
+        visited: set[str] = set()
         queue: deque[tuple[str, int]] = deque()
-        queue.append((self.base_url, 0))
-        filtered_count: int = 0
+
+        # The seed URL is curated — keep its query params verbatim.
+        start = normalize_url(seed.url, allowed_params=seed.allowed_params,
+                              strip_query=False)
+        queue.append((start, 0))
+        follow_re = re.compile(seed.follow_pattern) if seed.follow_pattern else None
+
+        def enqueue(raw_link: str, depth: int) -> None:
+            """Normalise + validate a discovered link before queueing."""
+            normalized = normalize_url(
+                raw_link, allowed_params=seed.allowed_params, strip_query=True
+            )
+            if normalized in visited:
+                return
+            if not is_host_allowed(normalized, self.allowed_hosts):
+                return
+            if self.denylist.is_denied(normalized):
+                return
+            link_type = self._classify_url(normalized)
+            if link_type in ("pdf", "docx") and not seed.follow_pdfs:
+                return
+            if link_type == "skip":
+                return
+            if follow_re and not follow_re.search(normalized):
+                return
+            queue.append((normalized, depth))
 
         while queue:
             current_url, depth = queue.popleft()
 
-            if current_url in self._visited:
+            if current_url in visited:
                 continue
-            if not self._is_same_domain(current_url):
-                continue
+            visited.add(current_url)
+
             if not self._is_allowed(current_url):
                 print(f"  [robots.txt] Skipping: {current_url}")
                 continue
-            if not self._is_relevant_path(current_url):
-                filtered_count += 1
-                # Mark as visited so we don't re-queue it later
-                self._visited.add(current_url)
-                continue
-
-            self._visited.add(current_url)
 
             url_type = self._classify_url(current_url)
-            crawled = CrawledURL(url=current_url, type=url_type, depth=depth)
-            results.append(crawled)
+            results.append(CrawledURL(
+                url=current_url, type=url_type, depth=depth, seed_id=seed.id
+            ))
 
-            if url_type == "skip":
-                print(f"  [skip] {current_url}")
+            if url_type != "html" or depth >= seed.max_depth:
                 continue
 
-            print(f"  [depth {depth}] {url_type.upper():>4s}  {current_url}")
-
-            if url_type != "html" or depth >= self.max_depth:
+            if current_url in self._fetched:
                 continue
+            self._fetched.add(current_url)
 
-            # Fetch HTML to discover more links
             try:
                 response = self._session.get(current_url, timeout=self.timeout)
                 response.raise_for_status()
             except Exception as exc:
-                print(f"  [error] {current_url}: {exc}")
+                print(f"  [crawl-error] {current_url}: {exc}")
                 continue
 
-            links = self._extract_links(response.text, current_url)
-            for link in links:
-                if link not in self._visited:
-                    queue.append((link, depth + 1))
+            for link in self._extract_links(response.text, current_url):
+                enqueue(link, depth + 1)
 
             if self.delay > 0:
                 time.sleep(self.delay)
 
-        print(f"\nCrawl complete: {len(results)} URLs "
-              f"({len([r for r in results if r.type != 'skip'])} extractable) "
-              f"[{filtered_count} filtered by path patterns]")
         return results
+
+    # ------------------------------------------------------------------ #
 
     @staticmethod
     def filter_by_type(results: list[CrawledURL], url_type: str) -> list[str]:

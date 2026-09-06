@@ -23,11 +23,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 # --------------------------------------------------------------------------- #
-#  Sentence-split regex (handles Serbian Latin + English end punctuation)     #
-# --------------------------------------------------------------------------- #
-
+# Sentence-split regex (handles Serbian Latin/Cyrillic + English end
+# punctuation).  NB: stdlib `re` does not support \p{Lu} — use explicit
+# uppercase ranges instead.
 _SENTENCE_RE = re.compile(
-    r"(?<=[.!?\u2026\u203C\u2047-\u2049])\s+(?=\p{Lu})",
+    r"(?<=[.!?\u2026\u203C\u2047-\u2049])\s+(?=[A-Z\u0410-\u042F"
+    r"\u0402\u0408\u0409\u040A\u040B\u040F\u0401])",
     re.UNICODE,
 )
 

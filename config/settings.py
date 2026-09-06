@@ -2,6 +2,10 @@
 config/settings.py -- Scraper-only configuration.
 
 All values can be overridden via environment variables or a .env file.
+
+The scrape PLAN itself (which URLs, priorities, refresh cadences,
+denylist, crawl rules) lives in data/urls.json — this module only
+controls runtime behaviour.
 """
 
 from pydantic_settings import BaseSettings
@@ -14,6 +18,14 @@ class Settings(BaseSettings):
     VECTOR_DB_PATH: str = "./data/vector_store"
 
     # ------------------------------------------------------------------ #
+    #  Scrape plan (data source)                                           #
+    # ------------------------------------------------------------------ #
+    URLS_JSON_PATH: str = "./data/urls.json"
+
+    # Only seeds whose priority is in this list are ingested.
+    INGEST_PRIORITIES: list[int] = [1, 2, 3]
+
+    # ------------------------------------------------------------------ #
     #  Chunking                                                            #
     # ------------------------------------------------------------------ #
     CHUNK_SIZE: int = 1000
@@ -23,36 +35,32 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     #  Crawler                                                             #
     # ------------------------------------------------------------------ #
-    CRAWLER_MAX_DEPTH: int = 1
-    CRAWLER_DELAY: float = 1.0
+    CRAWLER_DELAY: float = 1.5
     CRAWLER_TIMEOUT: int = 15
-    CRAWLER_USER_AGENT: str = "Mozilla/5.0 (compatible; UniversityRAGBot/1.0)"
+    CRAWLER_USER_AGENT: str | None = None  # None -> urls.json user_agent
 
     # ------------------------------------------------------------------ #
-    #  Crawl history                                                       #
+    #  Crawl history / refresh                                             #
     # ------------------------------------------------------------------ #
     CRAWL_HISTORY_ENABLED: bool = True
     CRAWL_HISTORY_PATH: str = "./data/crawl_history.json"
+    FORCE_REFRESH: bool = False  # ignore refresh cadence, re-ingest everything
 
     # ------------------------------------------------------------------ #
-    #  URL filtering                                                       #
+    #  Notice-board article-ID walk                                        #
     # ------------------------------------------------------------------ #
-    CRAWLER_FILTER_MODE: str = "include"
+    ID_WALK_ENABLED: bool = True
+    ID_WALK_MAX_MISSES: int = 20
 
-    CRAWLER_INCLUDE_PATTERNS: list[str] = [
-        r"^/$",
-        r"^/studijski-programi",
-        r"^/matematika-studije",
-        r"^/informatika-studije",
-        r"^/oglasna-tabla",
-        r"",
-    ]
+    # ------------------------------------------------------------------ #
+    #  Text variants (dual script + ASCII folding)                         #
+    # ------------------------------------------------------------------ #
+    TRANSLITERATE_VARIANTS: bool = True
 
-    CRAWLER_EXCLUDE_PATTERNS: list[str] = [
-        r"blog\.imi\.pmf\.kg\.ac\.rs",
-        r"/images/",
-        r"/office365",
-    ]
+    # ------------------------------------------------------------------ #
+    #  OCR for scanned PDFs (smanjenje4112025.pdf, ...)                    #
+    # ------------------------------------------------------------------ #
+    OCR_ENABLED: bool = False
 
     # ------------------------------------------------------------------ #
     #  Embedding model (read from shared_config.json at runtime;          #

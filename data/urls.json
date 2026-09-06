@@ -1,0 +1,919 @@
+{
+  "meta": {
+    "name": "IMI PMF Kragujevac — chatbot scraper seed list",
+    "target_audience": "prospective students and current undergraduates of Matematika / Informatika",
+    "generated": "2026-08-24",
+    "primary_host": "imi.pmf.kg.ac.rs",
+    "secondary_hosts": ["www.pmf.kg.ac.rs", "kg.ac.rs", "studentskicentar-kg.rs"],
+    "language": "sr",
+    "scripts": ["Cyrillic", "Latin"],
+    "english_version_exists": false,
+    "cms": "Joomla (heavily customised; SEF rewrites, no sitemap, no RSS)",
+    "seed_count_html": 46,
+    "seed_count_pdf": 41,
+    "derived_course_pdfs": 156
+  },
+
+  "crawl_rules": {
+    "respect_robots_txt": true,
+    "robots_disallow": [
+      "/administrator/", "/cache/", "/components/", "/images/", "/includes/",
+      "/installation/", "/language/", "/libraries/", "/media/", "/modules/",
+      "/plugins/", "/templates/", "/tmp/", "/xmlrpc/", "/engine/"
+    ],
+    "sitemap_xml": null,
+    "rss_feed": null,
+    "max_depth_from_seed": 1,
+    "politeness_delay_ms": 1500,
+    "user_agent": "IMI-Thesis-Bot/1.0 (master thesis research; contact: <your email>)",
+
+    "url_normalization": [
+      {
+        "rule": "lowercase_host",
+        "why": "host is case-insensitive"
+      },
+      {
+        "rule": "strip_query_string_on_SEF_paths",
+        "why": "CRITICAL. Any arbitrary query string returns HTTP 200 with identical content. /o-institutu?zzz=123 == /o-institutu. Without this the crawl frontier is unbounded.",
+        "whitelist_params": ["id", "page"]
+      },
+      {
+        "rule": "strip_tab_selectors",
+        "params": ["osnovne", "master", "doktorske", "cesta-pitanja"],
+        "why": "client-side JS tab selectors; server returns byte-identical HTML"
+      },
+      {
+        "rule": "collapse_index_php",
+        "why": "/index.php?id=N and /?id=N are the same page"
+      },
+      {
+        "rule": "map_legacy_program_urls",
+        "map": {
+          "/index.php?page=studije_mat&id=*": "/matematika-studije",
+          "/index.php?page=studije_inf&id=*": "/informatika-studije"
+        },
+        "why": "id param is ignored on page=studije_*; any value returns the same page"
+      },
+      {
+        "rule": "fix_missing_slash",
+        "example": "imi.pmf.kg.ac.rs?id=13938 -> imi.pmf.kg.ac.rs/index.php?id=13938",
+        "why": "the site's own navigation emits this malformed form"
+      },
+      {
+        "rule": "percent_encode_paths",
+        "why": "/pub/ filenames contain literal spaces, commas, parentheses and Cyrillic characters; encoding in the HTML is inconsistent"
+      },
+      {
+        "rule": "canonical_form",
+        "why": "no <link rel=canonical> and no og:url anywhere on either site — dedupe must be rule-based, not markup-based",
+        "prefer": "SEF path where one exists, otherwise /index.php?id=N"
+      }
+    ],
+
+    "denylist": [
+      { "pattern": "index.php?option=com_content&task=view*", "reason": "staff CV/Publications/Conferences tabs — one page is a 95-entry bibliography; ~42 staff. Single biggest noise source on the site." },
+      { "pattern": "index.php?option=com_phocagallery*", "reason": "photo gallery component; returns 403 and has infinite param space" },
+      { "pattern": "index.php?option=com_users*", "reason": "login / registration / password reset" },
+      { "pattern": "index.php?option=com_search*", "reason": "no search component installed; falls through to unrelated pages at HTTP 200" },
+      { "pattern": "login.microsoftonline.com/*", "reason": "Azure AD SSO target of the Office 365 button" },
+      { "pattern": "*?limitstart=*", "reason": "confirmed no-op; returns identical first page" },
+      { "pattern": "*?start=*", "reason": "confirmed no-op; returns identical first page" },
+      { "pattern": "*?tmpl=component*", "reason": "param ignored, returns full page — pure duplicate" },
+      { "pattern": "*?print=1*", "reason": "param ignored — pure duplicate" },
+      { "pattern": "*?sort=* | *?ordering=* | *?dir=* | *?filter*", "reason": "ignored params -> duplicates" },
+      { "pattern": "imi.pmf.kg.ac.rs/seminar-scimi-istrazivanja-i-razvoj", "reason": "129 research seminar abstracts + 129 PDFs, 2008-2026. Researcher-facing." },
+      { "pattern": "imi.pmf.kg.ac.rs/pub/*/scimi*.pdf", "reason": "the 129 seminar abstract PDFs" },
+      { "pattern": "imi.pmf.kg.ac.rs/projekti-istrazivanja-i-razvoj", "reason": "20 research projects, all 2011-2015. Stale, no student-facing content." },
+      { "pattern": "imi.pmf.kg.ac.rs/moodle/**", "reason": "live Moodle, session tokens, effectively infinite. Exception: allow /moodle/course/index.php?categoryid=N for the course catalogue only." },
+      { "pattern": "imi.pmf.kg.ac.rs/kongres*", "reason": "14th Serbian Mathematical Congress microsite, FROZEN at May 2018. Deadlines and fees 8 years out of date." },
+      { "pattern": "imi.pmf.kg.ac.rs/mozesit/*", "reason": "Unity workshop microsite, FROZEN at April 2017, aimed at secondary-school pupils" },
+      { "pattern": "imi.pmf.kg.ac.rs/TEMATCOM2026*", "reason": "teacher/researcher conference, event already passed (29-30 May 2026)" },
+      { "pattern": "imi.pmf.kg.ac.rs/dms/*", "reason": "Society of Mathematicians branch — audience is school teachers and pupils" },
+      { "pattern": "imi.pmf.kg.ac.rs/imipython/*", "reason": "Python tutorial site; subpages return 403 so only an unusable table of contents is reachable" },
+      { "pattern": "imi.pmf.kg.ac.rs/jesmac/*", "reason": "research journal" },
+      { "pattern": "match.pmf.kg.ac.rs/* | kjm.pmf.kg.ac.rs/* | www.pmf.kg.ac.rs/KJS/*", "reason": "research journals (MATCH, Kragujevac J. of Math/Science)" },
+      { "pattern": "nasportal.pmf.kg.ac.rs/*", "reason": "teacher-only portal" },
+      { "pattern": "blog.imi.pmf.kg.ac.rs/category/* | /author/* | /tag/* | /page/* | /feed/* | /wp-admin/* | /wp-json/*", "reason": "WordPress taxonomy duplicates — every post appears on 3+ paths" },
+      { "pattern": "www.pmf.kg.ac.rs/?id=52", "reason": "STALE TRAP — still serves the 2023/24 admission competition at HTTP 200. Will produce wrong quotas and dates." },
+      { "pattern": "www.pmf.kg.ac.rs/?id=705|443|1361|715|1371|845|838|839|840|805|807|808|810|893|20|162|704|844|1119|1560|1561|1726|435|437|450|56|58", "reason": "procurement, financial reports, council sessions, academic promotions — governance, not student-facing" },
+      { "pattern": "ibe.pmf.kg.ac.rs/* | chem.pmf.kg.ac.rs/* | fizika.pmf.kg.ac.rs/*", "reason": "other institutes (biology, chemistry, physics)" },
+      { "pattern": "indeks.pmfpsikg.fakultis.com/*", "reason": "psychology-only student portal on a third-party domain" }
+    ],
+
+    "content_extraction": [
+      { "rule": "strip_boilerplate_address_block", "detail": "'Radoja Domanovića 12' + fax '+381 34 335040' repeats on all ~42 staff pages and in every footer. Keep it once (from /kontakt) or it will dominate retrieval for any address query." },
+      { "rule": "strip_nav_and_footer", "detail": "/cemio and /ceramo are ~90% shared template with only 1-2 unique paragraphs each" },
+      { "rule": "transliterate_both_ways", "detail": "MANDATORY. Index every chunk in both Cyrillic and Latin. 'Нумеричка математика' / 'Numerička matematika' / 'numericka_matematika' are three surface forms of one entity and the site mixes all three. Also index the ASCII-folded form (č->c, š->s, ž->z, ć->c, đ->dj) because users type without diacritics." },
+      { "rule": "ocr_fallback", "detail": "these PDFs are image scans with no text layer: smanjenje4112025.pdf (enrollment discounts — exactly what students ask about), saopstenje2026.pdf, kmatematika2026.pdf" },
+      { "rule": "stamp_academic_year", "detail": "tag every chunk with the academic year it refers to. Multiple contradictory years are live simultaneously (see known_conflicts)." },
+      { "rule": "prefer_h1_as_title", "detail": "the same article ID can have different anchor text on /vesti vs /oglasna-tabla" }
+    ]
+  },
+
+  "change_detection": {
+    "method": "monotonic_article_id_walk",
+    "why": "There is no RSS feed, no sitemap and no working pagination anywhere on imi.pmf.kg.ac.rs. This is the cheap replacement and it is better than a feed.",
+    "url_template": "https://imi.pmf.kg.ac.rs/vesti/{id}-x",
+    "notes": [
+      "The slug after the ID is decorative — only the leading integer resolves. '-x' is enough.",
+      "The hyphen plus at least one character is REQUIRED: /vesti/18845 returns 404, /vesti/18845-x returns the article.",
+      "IDs are shared by news AND notice-board items and increase monotonically with publication time.",
+      "IDs are never reused or renumbered — safe as vector-DB primary keys. Use the integer, not the URL.",
+      "A 404 renders 'Tražena stranica nije nađena.' — trivial string match.",
+      "Gaps of 4+ consecutive missing IDs occur naturally. Allow ~20 consecutive 404s before declaring the head reached."
+    ],
+    "last_seen_max_id_at_generation": 18845,
+    "id_issuance_rate_per_day": 2.0,
+    "daily_supplement": {
+      "url": "https://imi.pmf.kg.ac.rs/oglasna-tabla",
+      "why": "article pages carry NO publication date and NO author. The notice-board table is the only place the DD.MM.YYYY date and author exist. Fetch it once a day purely to harvest that metadata.",
+      "warning": "hard-capped rolling window of 30 items with NO pagination and NO archive. During exam season (~10 posts/week) the whole window turns over in ~3 days. Poll at least daily, twice daily in June-July and late August."
+    },
+    "attachment_change_detection": {
+      "method": "diff the /pub/ hrefs on the parent page",
+      "why": "the /pub/{md5}_{MMDDYYYY_HHMMSS}/ directory changes on every re-upload, so a changed href means a revised document — no need to download the PDF to know it changed",
+      "warning": "the timestamp is US-style MMDDYYYY, inverted relative to the DD.MM.YYYY the site displays. Easy parsing bug."
+    }
+  },
+
+  "seeds": [
+    {
+      "id": "imi-upis",
+      "url": "https://imi.pmf.kg.ac.rs/upis-studije",
+      "title_sr": "Upis 2026/2027",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "weekly",
+      "refresh_burst": "daily during Feb-Mar and mid-May to mid-Sep",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Institute admission hub. URL is stable across years; the content is what changes. Also reachable at /index.php?id=13938 — dedupe."
+    },
+    {
+      "id": "imi-upis-arhiva",
+      "url": "https://imi.pmf.kg.ac.rs/upis-studije/482-dokumenti-za-pripremu-prijemnog-ispita",
+      "title_sr": "Dokumenti za pripremu prijemnog ispita",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Past entrance exams with solutions 2020-2026. Same article ID 482 is also served at /upis-studije/482-upis — dedupe by ID."
+    },
+    {
+      "id": "imi-priprema",
+      "url": "https://imi.pmf.kg.ac.rs/upis-studije/10327-besplatna-priprema-prijemnog-ispita-iz-matematike",
+      "title_sr": "Besplatna priprema prijemnog ispita iz matematike",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "weekly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "11 free prep lessons + registration form. Article ID changes each admission cycle — rediscover from /upis-studije."
+    },
+    {
+      "id": "imi-smerovi",
+      "url": "https://imi.pmf.kg.ac.rs/upis-studije/11843-smerovi-na-oas-matematike-i-oas-informatike",
+      "title_sr": "Smerovi na OAS matematike i OAS informatike",
+      "category": "programs",
+      "priority": 1,
+      "refresh": "quarterly",
+      "type": "html",
+      "notes": "AUTHORITATIVE track list: Matematika 3 tracks, Informatika 2 tracks. Overrides the older '3 modules incl. IKT' claims elsewhere on the site."
+    },
+    {
+      "id": "imi-matematika",
+      "url": "https://imi.pmf.kg.ac.rs/matematika-studije",
+      "title_sr": "Studije matematike",
+      "category": "programs",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Master record for mathematics. All three levels are on this ONE page behind JS tabs — ?osnovne/?master/?doktorske return identical HTML, so fetch once. Source of the mat_os/ course PDF links."
+    },
+    {
+      "id": "imi-informatika",
+      "url": "https://imi.pmf.kg.ac.rs/informatika-studije",
+      "title_sr": "Studije informatike",
+      "category": "programs",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Master record for informatics + an embedded FAQ (?cesta-pitanja tab, same HTML). WARNING: the FAQ text contains stale numbers — see known_conflicts."
+    },
+    {
+      "id": "imi-studijski-programi",
+      "url": "https://imi.pmf.kg.ac.rs/studijski-programi",
+      "title_sr": "Studije",
+      "category": "programs",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Thin hub page, two links only. Include for link discovery, low text value."
+    },
+    {
+      "id": "imi-uslovni",
+      "url": "https://imi.pmf.kg.ac.rs/uslovni-predmeti",
+      "title_sr": "Uslovni predmeti",
+      "category": "regulations",
+      "priority": 1,
+      "refresh": "quarterly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Prerequisite rules. The HTML body is just two PDF links — the answer is entirely inside the PDFs."
+    },
+    {
+      "id": "imi-ppm",
+      "url": "https://imi.pmf.kg.ac.rs/ppm-grupa-predmeta",
+      "title_sr": "PPM grupa predmeta",
+      "category": "programs",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Pedagogical-psychological-methodical block (teacher licence). PDF-only body."
+    },
+    {
+      "id": "imi-inf-predmeti-na-mat",
+      "url": "https://imi.pmf.kg.ac.rs/index.php?id=13671",
+      "title_sr": "Informatički predmeti",
+      "category": "programs",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Which informatics courses count on OAS/MAS mathematics. No SEF alias exists."
+    },
+    {
+      "id": "imi-praksa",
+      "url": "https://imi.pmf.kg.ac.rs/strucna-praksa",
+      "title_sr": "Stručna praksa",
+      "category": "practical",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Internship rules, forms, and live company offers (Inovatec, Intermino, HTec, Syrmia, Državni Data Centar...). PARSE RAW HTML — markdown converters strip the hrefs on this page."
+    },
+    {
+      "id": "imi-brucosi",
+      "url": "https://imi.pmf.kg.ac.rs/brucosi",
+      "title_sr": "Brucoši",
+      "category": "first_year",
+      "priority": 1,
+      "refresh": "weekly",
+      "refresh_burst": "daily in September-October",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "First-year onboarding: IMI account (ime.prezime / JMBG), Office 365, Moodle, Eduroam, GitLab, exam rulebook, orientation deck."
+    },
+    {
+      "id": "imi-rasporedi",
+      "url": "https://imi.pmf.kg.ac.rs/rasporedi",
+      "title_sr": "Raspored časova",
+      "category": "schedules",
+      "priority": 1,
+      "refresh": "weekly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Hub. The 26 year/track labels (M1, M2-T, I2-SI, ...) are NOT separate URLs — they all switch inside one JS app."
+    },
+    {
+      "id": "imi-raspored-app",
+      "url": "https://imi.pmf.kg.ac.rs/raspored_pdf/",
+      "title_sr": "Raspored časova (aplikacija)",
+      "category": "schedules",
+      "priority": 1,
+      "refresh": "weekly",
+      "refresh_burst": "daily in the first 3 weeks of October and March",
+      "type": "html_app",
+      "notes": "Despite the folder name this is a live HTML timetable (looks like an aSc TimeTables export), not a PDF. TRAILING SLASH IS MANDATORY — /raspored_pdf/index.html 404s. No version marker: detect changes by content hash. Carries instructor names, so this is the only source for 'who teaches X'."
+    },
+    {
+      "id": "imi-raspored-ispita",
+      "url": "https://imi.pmf.kg.ac.rs/raspored-ispita",
+      "title_sr": "Raspored ispita",
+      "category": "schedules",
+      "priority": 1,
+      "refresh": "daily",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "12 links, all PDFs, no pagination. Detect revisions by diffing the /pub/ hrefs — a revision already happened (jun-sept inf.pdf -> jun-sept inf-2.pdf)."
+    },
+    {
+      "id": "imi-oglasna-tabla",
+      "url": "https://imi.pmf.kg.ac.rs/oglasna-tabla",
+      "title_sr": "Oglasna tabla",
+      "category": "notices",
+      "priority": 1,
+      "refresh": "daily",
+      "refresh_burst": "twice daily in June-July and mid-Aug to mid-Sep",
+      "type": "html_table",
+      "notes": "Item titles are NOT links — bodies expand via JS. Rows map to /vesti/{ID}-x in exact descending ID order. 30-item rolling window, no archive, ?start= is ignored. Fetch mainly for the date + author columns."
+    },
+    {
+      "id": "imi-vesti",
+      "url": "https://imi.pmf.kg.ac.rs/vesti",
+      "title_sr": "Vesti sa Instituta",
+      "category": "notices",
+      "priority": 2,
+      "refresh": "daily",
+      "type": "html_list",
+      "notes": "10-item rolling window, no pagination, NO dates shown. Listing is not strictly ID-sorted. Use the ID walk (see change_detection) as the real ingest path; this page is only a discovery aid."
+    },
+    {
+      "id": "imi-kontakt",
+      "url": "https://imi.pmf.kg.ac.rs/kontakt",
+      "title_sr": "Kontakt",
+      "category": "institute",
+      "priority": 1,
+      "refresh": "quarterly",
+      "type": "html",
+      "notes": "034/336-223, fax 034/335-040, imi_info@pmf.kg.ac.rs, imi.servis@pmf.kg.ac.rs, director dr Bojana Borovićanin."
+    },
+    {
+      "id": "imi-o-institutu",
+      "url": "https://imi.pmf.kg.ac.rs/o-institutu",
+      "title_sr": "O institutu",
+      "category": "institute",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Founded 1976, current name 1996. Answers 'what is this place'."
+    },
+    {
+      "id": "imi-nastavno-osoblje",
+      "url": "https://imi.pmf.kg.ac.rs/nastavno-osoblje",
+      "title_sr": "Nastavnici i saradnici",
+      "category": "staff",
+      "priority": 2,
+      "refresh": "quarterly",
+      "type": "html_list",
+      "notes": "42 profile links. HARVEST THE HREFS — do not enumerate IDs, they are sparse (66 to 17818)."
+    },
+    {
+      "id": "imi-staff-profile",
+      "url": "https://imi.pmf.kg.ac.rs/index.php?id={staff_id}&page=nastavnik",
+      "title_sr": "Profil nastavnika",
+      "category": "staff",
+      "priority": 2,
+      "refresh": "quarterly",
+      "type": "html_template",
+      "count": 42,
+      "ids": [66, 311, 312, 316, 318, 320, 325, 327, 330, 331, 332, 334, 335, 336, 337, 1145, 1147, 1149, 2563, 2783, 4038, 4047, 8269, 12283, 12287, 12288, 12289, 12290, 12292, 12294, 12295, 12296, 13077, 16116, 16698, 17590, 17591, 17592, 17618, 17619, 17623, 17818],
+      "keep_blocks": ["name", "academic_title", "phone_extension", "email"],
+      "strip_blocks": ["postal_address", "fax", "photo", "Cv tab", "Publications tab", "Conferences tab", "Gallery tab"],
+      "notes": "Thin contact cards. NO office number, NO consultation hours, NO courses taught — that data does not exist on this site. Always use the &page=nastavnik form."
+    },
+    {
+      "id": "imi-udzbenici",
+      "url": "https://imi.pmf.kg.ac.rs/publikacije-istrazivanja-i-razvoj",
+      "title_sr": "Publikacije — udžbenici i zbirke zadataka",
+      "category": "practical",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html_partial",
+      "extract_only": "the 'udžbenici i zbirke zadataka' block (9 items, 2003-2019)",
+      "notes": "Answers 'which textbook for course X'. Drop the journal entries on the same page."
+    },
+    {
+      "id": "imi-office365",
+      "url": "https://imi.pmf.kg.ac.rs/office365",
+      "title_sr": "Office 365 for Education",
+      "category": "practical",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Free O365 for all PMF students. Deny the login.microsoftonline.com button target."
+    },
+    {
+      "id": "imi-eduroam",
+      "url": "https://imi.pmf.kg.ac.rs/index.php?id=2305",
+      "title_sr": "Eduroam",
+      "category": "practical",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Campus Wi-Fi setup."
+    },
+    {
+      "id": "imi-moodle-catalog",
+      "url": "https://imi.pmf.kg.ac.rs/moodle/course/index.php?categoryid={n}",
+      "title_sr": "Moodle katalog kurseva",
+      "category": "practical",
+      "priority": 3,
+      "refresh": "quarterly",
+      "type": "html_template",
+      "allowed_category_ids": [81, 86, 93, 91, 92],
+      "notes": "81=OAS Matematika, 86=OAS Informatika, 93=opšti predmeti, 91=MAS Matematika, 92=MAS Informatika. Guest access is open (no login wall). VERIFIED CAVEAT: these top-level IDs show only a year/semester category TREE, not course names — you must recurse one level into the child categoryid values to reach actual courses. Recurse at most 2 levels and never descend into course CONTENT (mod/, forum/, quiz/ — session URLs, effectively infinite)."
+    },
+    {
+      "id": "imi-cemio",
+      "url": "https://imi.pmf.kg.ac.rs/cemio",
+      "title_sr": "CeMIO — Centar za matematičko i informatičko obrazovanje",
+      "category": "institute",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html_partial",
+      "notes": "~2 unique paragraphs on a full site template. Strip nav/footer aggressively."
+    },
+    {
+      "id": "imi-ceramo",
+      "url": "https://imi.pmf.kg.ac.rs/ceramo",
+      "title_sr": "CeRAMO — Centar za računarsko modeliranje i optimizaciju",
+      "category": "institute",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html_partial",
+      "notes": "Same shape as CeMIO."
+    },
+    {
+      "id": "imi-zavrsni-mat",
+      "url": "https://imi.pmf.kg.ac.rs/index.php?id=15845",
+      "title_sr": "Završni rad na OAS matematike",
+      "category": "regulations",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "follow_pdfs": false,
+      "notes": "Thesis rules + forms + LaTeX pack. NOTE: the nav label says 'Osnovne akademske studije matematike' but this is a THESIS page, not a curriculum page. Skip the 27 individual topic PDFs."
+    },
+    {
+      "id": "imi-zavrsni-inf",
+      "url": "https://imi.pmf.kg.ac.rs/index.php?id=783",
+      "title_sr": "Završni rad na OAS informatike",
+      "category": "regulations",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "follow_pdfs": false,
+      "notes": "Same as above for informatics (>=180 ESPB gate, forms, templates)."
+    },
+
+    {
+      "id": "pmf-konkurs-oas",
+      "url": "https://www.pmf.kg.ac.rs/?id=1716",
+      "title_sr": "Konkurs za upis na OAS 2026/2027",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "weekly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "RICHEST single admission page. Full competition text: quotas, all dates, fees, scoring, exemptions. The ?id= changes each cycle — rediscover from ?id=133 or ?id=1409."
+    },
+    {
+      "id": "pmf-upis-hub",
+      "url": "https://www.pmf.kg.ac.rs/?id=1409",
+      "title_sr": "Upis 2026/27",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "weekly",
+      "refresh_burst": "daily 15 Jun - 10 Sep",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Cycle hub: konkurs, saopštenje, and s/p/k rank lists per programme. ?id= changes each cycle."
+    },
+    {
+      "id": "pmf-prijemni",
+      "url": "https://www.pmf.kg.ac.rs/?id=1295",
+      "title_sr": "Prijemni ispit",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "STABLE URL. Which exam per programme — both Matematika and Informatika take the MATHEMATICS exam. Also holds the correct 2023 math paper that /482 mislabels."
+    },
+    {
+      "id": "pmf-prijava",
+      "url": "https://www.pmf.kg.ac.rs/?id=1294",
+      "title_sr": "Prijava",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "STABLE URL. Required documents per study level."
+    },
+    {
+      "id": "pmf-rangiranje",
+      "url": "https://www.pmf.kg.ac.rs/?id=1296",
+      "title_sr": "Rangiranje",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "STABLE URL. Scoring formula S = (P1+P2+P3+P4) x 2, max 40 school + 60 exam."
+    },
+    {
+      "id": "pmf-upis-postupak",
+      "url": "https://www.pmf.kg.ac.rs/?id=1297",
+      "title_sr": "Upis (postupak)",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "STABLE URL. What to bring on enrollment day: 2x ŠV-20, index, fees."
+    },
+    {
+      "id": "pmf-faq",
+      "url": "https://www.pmf.kg.ac.rs/?id=881",
+      "title_sr": "Često postavljana pitanja",
+      "category": "admission",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "HIGHEST FACT DENSITY per byte on either site. Already in Q&A form — near-ideal vector-DB material. Per-programme upis emails."
+    },
+    {
+      "id": "pmf-pripremna",
+      "url": "https://www.pmf.kg.ac.rs/?id=1719",
+      "title_sr": "Pripremna nastava",
+      "category": "admission",
+      "priority": 2,
+      "refresh": "weekly",
+      "refresh_burst": "daily Feb-Jun",
+      "type": "html",
+      "notes": "Faculty-wide prep classes + Google Form registration links. ?id= changes each cycle."
+    },
+    {
+      "id": "pmf-matura",
+      "url": "https://www.pmf.kg.ac.rs/?id=1177",
+      "title_sr": "Vrednovanje Državne mature",
+      "category": "admission",
+      "priority": 2,
+      "refresh": "quarterly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Per-programme matura evaluation tables (.docx). Increasingly relevant as the state matura rolls out."
+    },
+    {
+      "id": "pmf-konkursi",
+      "url": "https://www.pmf.kg.ac.rs/?id=133",
+      "title_sr": "Konkursi, stipendije i pozivi",
+      "category": "scholarships",
+      "priority": 2,
+      "refresh": "weekly",
+      "type": "html",
+      "notes": "STABLE discovery anchor for each new cycle's konkurs. Mostly an outbound relay — the scholarship substance is on kg.ac.rs / prosveta.gov.rs."
+    },
+    {
+      "id": "pmf-cenovnik",
+      "url": "https://www.pmf.kg.ac.rs/?id=51",
+      "title_sr": "Cenovnik usluga",
+      "category": "fees",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "STABLE URL. No amounts in the HTML — every number is inside the linked PDFs. New decision published each January."
+    },
+    {
+      "id": "pmf-studentska-sluzba",
+      "url": "https://www.pmf.kg.ac.rs/?id=25",
+      "title_sr": "Studentska služba",
+      "category": "student_services",
+      "priority": 1,
+      "refresh": "quarterly",
+      "type": "html",
+      "notes": "THE key admin page. Staff names + emails, office hours 9-13 every working day, tel 034 300 260, žiro račun 840-0000032764845-58 (poziv na broj 05-19)."
+    },
+    {
+      "id": "pmf-ispitni-rokovi",
+      "url": "https://www.pmf.kg.ac.rs/?id=527",
+      "title_sr": "Ispitni rokovi",
+      "category": "schedules",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "Full exam-period calendar with registration windows, redovni + apsolventski. Updated each academic year."
+    },
+    {
+      "id": "pmf-eprijava",
+      "url": "https://www.pmf.kg.ac.rs/?id=544",
+      "title_sr": "E-prijava / Studentski portal",
+      "category": "student_services",
+      "priority": 1,
+      "refresh": "quarterly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Electronic exam registration. Account activation is MANDATORY for all students. Support studentski.portal@pmf.kg.ac.rs. Portal itself at studportal.pmf.kg.ac.rs (login only — do not crawl)."
+    },
+    {
+      "id": "pmf-kalendar",
+      "url": "https://www.pmf.kg.ac.rs/?id=440",
+      "title_sr": "Kalendar rada",
+      "category": "schedules",
+      "priority": 1,
+      "refresh": "monthly",
+      "type": "html",
+      "notes": "Academic calendar 2025/26 and 2026/27: semester start/end, holidays, Dan fakulteta, freshman welcome (25.9.2026)."
+    },
+    {
+      "id": "pmf-molbe",
+      "url": "https://www.pmf.kg.ac.rs/?id=1244",
+      "title_sr": "Primeri molbi",
+      "category": "student_services",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "The faculty's 'obrasci' page — 5 .docx templates under /images/slike4/ (NOT /pub/). The page itself is a thumbnail gallery with no prose body, and the files are .docx not .pdf, so route them to a different extractor."
+    },
+    {
+      "id": "pmf-propisi-nastava",
+      "url": "https://www.pmf.kg.ac.rs/?id=809",
+      "title_sr": "Propisi — obrazovanje i nastava",
+      "category": "regulations",
+      "priority": 2,
+      "refresh": "quarterly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "12 rulebooks including Pravilnik o osnovnim akademskim studijama and Pravilnik o ispitima — the actual rules on repeating a year, semester validation, exam retakes."
+    },
+    {
+      "id": "pmf-propisi-studenti",
+      "url": "https://www.pmf.kg.ac.rs/?id=812",
+      "title_sr": "Propisi — studenti",
+      "category": "regulations",
+      "priority": 2,
+      "refresh": "quarterly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "Disciplinary responsibility, student parliament, extracurricular credit."
+    },
+    {
+      "id": "pmf-biblioteka",
+      "url": "https://www.pmf.kg.ac.rs/?id=26",
+      "title_sr": "Biblioteka",
+      "category": "student_services",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Opening hours 8-20 Mon-Fri, 30 seats, 63k+ items. All students are automatic members."
+    },
+    {
+      "id": "pmf-lokacija",
+      "url": "https://www.pmf.kg.ac.rs/?id=698",
+      "title_sr": "Lokacija i kontakt",
+      "category": "institute",
+      "priority": 1,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Address, all leadership emails, PIB/matični broj."
+    },
+    {
+      "id": "pmf-sefovi-studija",
+      "url": "https://www.pmf.kg.ac.rs/?id=1047",
+      "title_sr": "Šefovi studija",
+      "category": "staff",
+      "priority": 2,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Matematika: prof. dr Nenad Stojanović. Informatika: vanr. prof. dr Tatjana Stojanović. Exactly the 'who do I ask about my programme' answer."
+    },
+    {
+      "id": "pmf-parlament",
+      "url": "https://www.pmf.kg.ac.rs/?id=53",
+      "title_sr": "Studentski parlament",
+      "category": "student_life",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "35 students, 6 departments, elections every April, studentski.parlament@pmf.kg.ac.rs."
+    },
+    {
+      "id": "pmf-organizacije",
+      "url": "https://www.pmf.kg.ac.rs/?id=54",
+      "title_sr": "Studentske organizacije",
+      "category": "student_life",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "ASPMF, founded 2013, 200+ members."
+    },
+    {
+      "id": "pmf-erasmus",
+      "url": "https://www.pmf.kg.ac.rs/?id=1035",
+      "title_sr": "Erasmus+",
+      "category": "scholarships",
+      "priority": 3,
+      "refresh": "quarterly",
+      "type": "html",
+      "notes": "Faculty coordinators + links to the university exchange pages."
+    },
+    {
+      "id": "pmf-akreditacija",
+      "url": "https://www.pmf.kg.ac.rs/?id=47",
+      "title_sr": "Uverenja o akreditaciji",
+      "category": "programs",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "Accredited student numbers per programme — OAS Matematika 50, OAS Informatika 50 (re-accredited 19.1.2026)."
+    },
+    {
+      "id": "pmf-vesti",
+      "url": "https://www.pmf.kg.ac.rs/index.php/vesti",
+      "title_sr": "Vesti (fakultet)",
+      "category": "notices",
+      "priority": 1,
+      "refresh": "daily",
+      "type": "html_list",
+      "notes": "Where the second admission round and tuition-subsidy notices actually appear. Item pattern /index.php/vesti/{ID}-{slug}; slugs are lossily transliterated (šk->k)."
+    },
+    {
+      "id": "pmf-oglasna-tabla",
+      "url": "https://www.pmf.kg.ac.rs/index.php/oglasna-tabla",
+      "title_sr": "Oglasna tabla (fakultet)",
+      "category": "notices",
+      "priority": 2,
+      "refresh": "daily",
+      "type": "html_list",
+      "notes": "Thesis defences, public lectures, faculty-wide student notices."
+    },
+
+    {
+      "id": "sckg-home",
+      "url": "https://www.studentskicentar-kg.rs/",
+      "title_sr": "Studentski centar Kragujevac",
+      "category": "student_life",
+      "priority": 2,
+      "refresh": "monthly",
+      "type": "html",
+      "follow_pdfs": true,
+      "notes": "THE dormitory authority — there is no faculty or university page with this information. 312 rooms across 4 pavilions, 3 canteens. Radoja Domanovića 1, literally next door to PMF."
+    },
+    {
+      "id": "kg-stipendije",
+      "url": "https://kg.ac.rs/vest.php?vest=5330",
+      "title_sr": "Stipendije najboljim studentima UNIKG",
+      "category": "scholarships",
+      "priority": 3,
+      "refresh": "yearly",
+      "type": "html",
+      "notes": "15.000 RSD/month, GPA >= 8.50, final-year OAS. Deadline mid-January. vest= ID changes each year — rediscover from kg.ac.rs/studenti.php."
+    },
+    {
+      "id": "kg-studenti",
+      "url": "https://kg.ac.rs/studenti.php",
+      "title_sr": "Studenti (Univerzitet u Kragujevcu)",
+      "category": "student_life",
+      "priority": 3,
+      "refresh": "quarterly",
+      "type": "html",
+      "notes": "University student hub. Stable discovery anchor for scholarship calls."
+    },
+    {
+      "id": "blog-imi-posts",
+      "url": "https://blog.imi.pmf.kg.ac.rs/{slug}/",
+      "title_sr": "IMI Blog",
+      "category": "student_life",
+      "priority": 3,
+      "refresh": "monthly",
+      "type": "html_template",
+      "notes": "OPTIONAL — student-written IT tutorials (FreeRTOS, ZFS, Kubernetes). Genuinely by informatika students, but technical rather than institutional; it will pull the retriever off-topic on 'what is IMI' style questions. If you index it, tag the chunks with a separate namespace and exclude that namespace from institutional queries. Last post Dec 2025. Crawl post URLs only."
+    }
+  ],
+
+  "pdf_seeds": {
+    "note": "These are the highest-value documents. WARNING: /pub/{md5}_{MMDDYYYY_HHMMSS}/ paths change on EVERY re-upload. Do not hardcode them long-term — re-resolve the hrefs from the parent HTML page each cycle. The URLs below are valid as of 2026-08-24.",
+    "admission": [
+      { "url": "https://www.pmf.kg.ac.rs/pub/60c45ac4d3d9caddeed4cac576249b3f_10072025_122657/konkurs2026.pdf", "title": "Konkurs za upis OAS 2026/27", "priority": 1, "parent": "pmf-konkurs-oas" },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/e7d65559ecfddea11824bf0bf0e20a43_02032026_123324/informator2026.pdf", "title": "Informator IMI 2026", "priority": 1, "parent": "imi-upis" },
+      { "url": "https://www.pmf.kg.ac.rs/pub/8d697136971ab16069bbcd6cec33c5ad_05192021_025234/prijavnilist2026.pdf", "title": "Prijavni list", "priority": 2, "parent": "pmf-upis-hub" },
+      { "url": "https://www.pmf.kg.ac.rs/pub/30a5649622990aa25d6adcbf66c48dc3_06042018_010324/program.pdf", "title": "Program upisa za osobe sa invaliditetom i pripadnike romske manjine", "priority": 2, "parent": "pmf-upis-hub" }
+    ],
+    "fees": [
+      { "url": "https://www.pmf.kg.ac.rs/pub/86674d154cebe5bdd092306e1420d542_05192016_104533/visinaskolarine4112025.pdf", "title": "Odluka o visini cena usluga (SVI IZNOSI)", "priority": 1, "parent": "pmf-cenovnik" },
+      { "url": "https://www.pmf.kg.ac.rs/pub/86674d154cebe5bdd092306e1420d542_05192016_104533/smanjenje4112025.pdf", "title": "Odluka o smanjenim troškovima i pogodnostima upisa", "priority": 1, "parent": "pmf-cenovnik", "warning": "SCANNED IMAGE — no text layer. Needs OCR." },
+      { "url": "https://www.pmf.kg.ac.rs/pub/3bb7bc1f2d669e25a26a9650e6bee832_04102017_115631/troskovi2024.pdf", "title": "Specifikacija troškova školarine", "priority": 2, "parent": "pmf-cenovnik" },
+      { "url": "https://www.pmf.kg.ac.rs/pub/d5e1bbbcc6542f094440e5805b5234c3_11282018_112008/pmf uputstvo - placanje.pdf", "title": "Uputstvo za uplatu", "priority": 2, "parent": "pmf-eprijava" }
+    ],
+    "prep_and_past_exams": [
+      { "url": "https://imi.pmf.kg.ac.rs/pub/8fd5a9d97666e59d67b832ac818b8f74_06262026_011900/inf2026 sa resenjima.pdf", "title": "Prijemni 2026 informatika + rešenja", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/577fac1e06388406787745297e227eb1_06262026_011907/mat2026 sa resenjima.pdf", "title": "Prijemni 2026 matematika + rešenja", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/2659a90757df32b4082c49503d52ee99_02032026_124335/prijemni2025mat-resenja.pdf", "title": "Prijemni 2025 matematika + rešenja", "priority": 2 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/b009a87f61d1ea5f078776575d2b7ce8_02032026_124349/prijemni2025inf-resenja.pdf", "title": "Prijemni 2025 informatika + rešenja", "priority": 2 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/328f55f2e47f04e5d5f476d5632d0d5d_10312023_071234/prijemni 2023 - matematika sa resenjima.pdf", "title": "Prijemni 2023 matematika + rešenja", "priority": 2, "warning": "the /482 archive page mislabels the 2023 math paper — this is the correct file, found via ?id=1295" },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/e741ed2670c43e9b24e05914bf190831_01102022_110138/zadaci za pripremu_2022.pdf", "title": "Zadaci za pripremu", "priority": 2 }
+    ],
+    "prep_lessons_2026": {
+      "note": "11 lessons linked from /brucosi and /upis-studije. Re-resolve each cycle.",
+      "priority": 2,
+      "base": "https://imi.pmf.kg.ac.rs/pub/",
+      "files": [
+        "0c14c0006f698cef395f9c8939cee779_02242026_013126/1. pripremna nastava.pdf",
+        "81d1a350b0385c61e0de0c8c01d9a9e7_03062026_011421/2. pripremna nastava.pdf",
+        "035e231d6ec0f36f96bc1071eb5dc324_03102026_050019/3. pripremna nastava.pdf",
+        "17b020158f81bcf12823c43de54355a4_05162025_102339/4.priprema.pdf",
+        "2614b1b15fea52dd0ff32fc0d73e7354_03252026_013452/5. pripremna nastava.pdf",
+        "156b20036bab329674e2fcc41c104953_04012026_092527/6. pripremna nastava.pdf",
+        "af3374c00003f868dfe85e4e33490537_04222026_111149/7. pripremna nastava.pdf",
+        "9650aff7cb779a140e54a4db793f0d77_06052025_114349/8. pripremna nastava.pdf",
+        "d2d57d7ab7953f445c95738402481d67_05062026_123146/9. pripremna nastava.pdf",
+        "61e1c8432c90951653d8b0994b0be4da_05132026_125128/10. pripremna nastava.pdf",
+        "0f16b93ba943622018aaf51ffa280a4b_05202026_094005/11. pripremna nastava.pdf"
+      ]
+    },
+    "programs": [
+      { "url": "https://imi.pmf.kg.ac.rs/pub/d6f363ae069d633af6a073f18f3af394_06042026_105335/prilog 5.1 knjiga predmeta.pdf", "title": "Knjiga predmeta SP OAS Matematika", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/59c5635d523c28092fbe26ff175eaebb_06042026_105318/sp oas matematika rezime.pdf", "title": "SP OAS Matematika — rezime", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/2d3ac9888c6ea6a20236baa2cd9b3755_06052026_094242/studijski program - osnovne akademske studije informatike 2025 (1).pdf", "title": "SP OAS Informatika 2025", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/f1e594ff7e00be636b287387adbdcb29_11122025_021122/studijski program - master akademske studije informatike 2025 (1).pdf", "title": "SP MAS Informatika 2025", "priority": 2 }
+    ],
+    "rules": [
+      { "url": "https://www.pmf.kg.ac.rs/pub/05f42194e673fa5c0854c4b5501a2608_06022016_105306/pravilnikostudijima2026.pdf", "title": "Pravilnik o osnovnim akademskim studijama", "priority": 1 },
+      { "url": "https://www.pmf.kg.ac.rs/pub/05f42194e673fa5c0854c4b5501a2608_06022016_105306/pravilnikoispitima.pdf", "title": "Pravilnik o ispitima", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/de4996f0cc2c9ead1526ab421f43148d_03282026_025830/pravilnik o polaganju ispita.pdf", "title": "Pravilnik o polaganju ispita (IMI)", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/5be59d8321302fea8e43efd4190f4b38_12062025_103809/nacin ostvarivanja predispitnih obaveza_skolska_2025_26.pdf", "title": "Način ostvarivanja predispitnih obaveza 2025/26", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/8693f4f8ddf990ba746e4c694f5a26b5_10032023_094631/uslovni predmeti - akreditacija 2019 - izmene 2023.pdf", "title": "Uslovni predmeti — informatika", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/ca46d1162eeb0861f8f909c51c3ca22d_03032022_115350/uslovni predmeti_2022 matematika.pdf", "title": "Uslovni predmeti — matematika", "priority": 1 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/4491abb803e5f117a62711678199d0c6_12062024_103338/Информација о полагању диференцијалних испита.pdf", "title": "Diferencijalni ispiti", "priority": 2, "warning": "Cyrillic filename — percent-encode" },
+      { "url": "https://www.pmf.kg.ac.rs/pub/05f42194e673fa5c0854c4b5501a2608_06022016_105306/drustvenegrupe.pdf", "title": "Pravilnik o podršci studentima iz osetljivih društvenih grupa", "priority": 2 },
+      { "url": "https://www.pmf.kg.ac.rs/pub/38b6518d3aaa235944b50de1c42c1a55_04042018_101805/disciplinskaodgovornost.pdf", "title": "Pravilnik o disciplinskoj odgovornosti studenata", "priority": 2 }
+    ],
+    "reference": [
+      { "url": "https://www.pmf.kg.ac.rs/pub/3bb7bc1f2d669e25a26a9650e6bee832_04102017_115631/informatororadu2026.pdf", "title": "Informator o radu PMF 2026", "priority": 1, "note": "Densest single faculty document — full org structure, all contacts, all three study levels, 48 bylaws. Seed it whole." },
+      { "url": "https://www.pmf.kg.ac.rs/pub/e3eea8c1406876481445172704fe852e_02282019_012630/uputstvo - prijava ispita - elektronski -prosireno.pdf", "title": "Uputstvo za elektronsku prijavu ispita", "priority": 1 },
+      { "url": "https://www.pmf.kg.ac.rs/pub/bb6128b08cb8484a3f6ee33f22ea5469_11282018_113021/pmf uputstvo - otvaranje naloga.pdf", "title": "Uputstvo za otvaranje naloga", "priority": 2 },
+      { "url": "https://imi.pmf.kg.ac.rs/pub/22910817d824ed98a68dc859ce43afd5_11032025_124346/imi mat_inf - prijem brucosa 2025.pdf", "title": "Prijem brucoša — orijentaciona prezentacija", "priority": 2 },
+      { "url": "https://www.pmf.kg.ac.rs/pub/3370d368e73d77101a0bf23af5e941fe_05142025_115635/statut432026.pdf", "title": "Statut PMF (prečišćen tekst 2026)", "priority": 3 }
+    ],
+    "schedules_current": {
+      "note": "VOLATILE. Always re-resolve from /rasporedi and /raspored-ispita — do not cache these paths.",
+      "priority": 1,
+      "examples": [
+        "https://imi.pmf.kg.ac.rs/pub/3a75bcb8c895fea9db0b6d868c5cb388_08142026_095242/rapored ispita 2026 jun-sept inf-2.pdf",
+        "https://imi.pmf.kg.ac.rs/pub/1e599dd3ca79826ccedca498a021ec64_07252026_052511/jun, jul, avgust i septembar 2.pdf",
+        "https://imi.pmf.kg.ac.rs/pub/c8378bf0c1f11678d003f2456d2642d9_10082024_091124/podela na grupe.pdf"
+      ]
+    }
+  },
+
+  "course_syllabi": {
+    "note": "156 individual course syllabus PDFs — one per subject. These are the single best chunk-per-document source in the whole corpus: each holds course name, ECTS, prerequisites, goals, content, literature and grading. No course has an HTML page; the PDF IS the course page. Directory listings return 403, so build the URLs from the slugs below or harvest the hrefs from the two program pages.",
+    "priority": 1,
+    "refresh": "yearly",
+    "warnings": [
+      "The site's own slugs contain typos — do NOT 'correct' them: strukutre_podataka_i_algoritmi_2, kompresija_i_zatita_podataka, teorija_izracunljivosti_i_racunske_komplesnosti, logicko_i_funkcijsko_programiranja (informatics, ends -a).",
+      "Some basenames exist in MULTIPLE directories with DIFFERENT content (zavrsni_rad, strucna_praksa, numericka_matematika, baze_podataka_1, racunarski_sistemi, osnovi_programiranja, uvod_u_finansijsku_matematiku). Key your vector-DB document ID on the FULL PATH, never the basename.",
+      "Math and informatics spell two shared courses differently: klijentske_veb_tehnologije (math) vs klijentske_web_tehnologije (informatics).",
+      "VERIFIED: the two typo'd filenames really do resolve, and the PDFs spell the course correctly INSIDE. Any spell-correction in your config will 404 them.",
+      "Two different PDF templates are in use: mat_os/ files open directly with 'Студијски програм: ...', while 2026/ and 2026-mas/ files open with a faculty letterhead block first. A parser keyed to a fixed line offset will misread one family.",
+      "A nonexistent slug returns an empty HTML shell rather than a 404 — check for an empty/HTML body, not just the status code."
+    ],
+    "verified": "2026-08-24 — 6 files sampled across all three directories, all resolved with an extractable Cyrillic text layer (no OCR needed). Fields present: Студијски програм, Назив предмета, Статус, Број ЕСПБ, Услов, Циљ, Исход, Садржај (теоријска/практична настава), Литература, Број часова, Методе извођења, Оцена знања.",
+    "sets": [
+      {
+        "program": "OAS Matematika",
+        "base": "https://imi.pmf.kg.ac.rs/knjiga_predmeta/mat_os/",
+        "extension": ".pdf",
+        "count": 63,
+        "slugs": ["matematicka_logika_i_teorija_skupova","uvod_u_geometriju","uvod_u_analizu_i_algebru","softverski_alati_1","engleski_jezik_a1","engleski_jezik_b1","racunarski_sistemi","analiza_1","linearna_algebra_1","diskretna_matematika","uvod_u_programiranje","engleski_jezik_a2","engleski_jezik_b2","praktikum_iz_programiranja_1","softverski_alati_2","analiza_2","analiticka_geometrija","linearna_algebra_2","uvod_u_finansijsku_matematiku","osnovi_programiranja","istorija_i_filozofija_matematike","praktikum_iz_programiranja_3","analiza_3","algebarske_strukture","geometrija","razvoj_naucne_misli","strukture_podataka_i_algoritmi_1","elementi_teorije_brojeva","elementi_teorije_skupova","diferencijalne_jednacine","algebra_i_logika","analiza_4","neeuklidske_geometrije","nacrtna_i_kompjuterska_geometrija","baze_podataka_1","bioetika","numericka_matematika","funkcionalna_analiza_1","topologija_1","programski_paketi_u_matematici","kombinatorna_geometrija","metodika_nastave_matematike","verovatnoca_i_statistika_1","funkcionalna_analiza_2","parcijalne_i_integralne_jednacine","kompleksna_analiza_1","strucna_praksa","furijeova_analiza_i_primene","topologija_2","kompleksna_analiza_2","istrazivacki_rad","verovatnoca_i_statistika_2","zavrsni_rad","matematicko_modeliranje","izborni_seminar","mehanika","diferencijalna_geometrija","praktikum_iz_programiranja_2","klijentske_veb_tehnologije","arhitektura_i_organizacija_racunara","racunarske_mreze","matematicka_logika_u_racunarstvu","logicko_i_funkcijsko_programiranje"]
+      },
+      {
+        "program": "OAS Informatika",
+        "base": "https://imi.pmf.kg.ac.rs/knjiga_predmeta/2026/",
+        "extension": ".pdf",
+        "count": 73,
+        "slugs": ["osnovi_programiranja","teorijske_osnove_informatike","matematika_1","racunarski_sistemi","praktikum_iz_programiranja_1","strukture_podataka_i_algoritmi_1","matematika_2","arhitektura_i_organizacija_racunara","praktikum_iz_programiranja_2","klijentske_web_tehnologije","engleski_a1","engleski_b1","operativni_sistemi_1","baze_podataka_1","strukutre_podataka_i_algoritmi_2","vizuelizacija_i_analiza_podataka","racunarske_mreze","objektno-orijentisano_programiranje","matematika_3","uvod_u_vestacku_inteligenciju","psihologija","osnove_preduzetnickog_menadzmenta","praktikum_iz_operativnih_sistema","praktikum_iz_objektno-orijentisanog_programiranja","engleski_a2","engleski_b2","pedagogija","marketing","dizajniranje_softvera","racunarske_simulacije","verovatnoca_i_statistika","uvod_u_nauku_o_podacima","formalni_jezici_i_jezicki_procesori","numericka_matematika","informacioni_sistemi","racunarska_grafika","metodika_nastave_informatike","obrazovni_softver","logicko_i_funkcijsko_programiranja","interakcija_covek-racunar","projektovanje_vlsi_sistema","web_programiranje","metodika_nastave_programiranja","skolska_praksa","izborni_seminar_1","strucna_praksa_r","operativni_sistemi_2","informaciona_bezbednost","paralelno_programiranje","softversko_inzenjerstvo","upravljanje_razvojem_softverskih_proizvoda","inteligentni_sistemi","mikroprocesorski_sistemi","kompresija_i_zatita_podataka","programiranje_mobilnih_uredjaja","automatizovana_isporuka_softvera_i_infrastruktura_u_oblaku","optimizacione_metode_u_racunarstvu","distribuirani_racunarski_sistemi","izborni_seminar_2","programski_prevodioci","kompjuterski_vid","baze_podataka_2","izborni_seminar_3","internet_stvari","teorija_brojeva_i_kriptografija","odabrana_poglavlja_elementarne_matematike","uvod_u_softversko_inzenjerstvo","kvalitet_i_testiranje_softvera","uvod_u_finansijsku_matematiku","elektronsko_poslovanje","strucna_praksa_s","projektni_zadatak","zavrsni_rad"]
+      },
+      {
+        "program": "MAS Informatika",
+        "base": "https://imi.pmf.kg.ac.rs/knjiga_predmeta/2026-mas/",
+        "extension": ".pdf",
+        "count": 20,
+        "priority": 2,
+        "slugs": ["odabrana_poglavlja_matematike","masinsko_ucenje","duboko_ucenje","obrada_i_analiza_velikih_kolicina_podataka","studijski_istrazivacki_rad_1","heuristicke_metode_optimizacije","obrada_prirodnih_jezika","generativna_vestacka_inteligencija","analiza_i_obrada_slike","predstavljanje_znanja_i_rezonovanje","neuro-simbolicko_racunanje","arhitektura_specijalizovanih_procesora_za_zakljucivanje","napredne_tehnologije_u_sajber_bezbednosti","master_izborni_seminar","strucna_praksa","studijski_istrazivacki_rad_2","zavrsni_rad","teorija_izracunljivosti_i_racunske_komplesnosti","racunarsko_modelovanje_i_simulacije","odabrana_poglavlja_numericke_matematike"]
+      }
+    ]
+  },
+
+  "known_conflicts": [
+    { "topic": "školarina (informatika)", "stale_source": "informatika-studije ?cesta-pitanja FAQ tab — 72.000 RSD", "authoritative": "84.000 RSD — konkurs2026.pdf and visinaskolarine4112025.pdf" },
+    { "topic": "broj smerova na informatici", "stale_source": "FAQ tab and www.pmf.kg.ac.rs/informatika/ — 3 modules including IKT", "authoritative": "2 modules (Softversko inženjerstvo, Računarske nauke) — /upis-studije/11843-smerovi" },
+    { "topic": "broj budžetskih mesta (informatika)", "stale_source": "FAQ tab and /informatika/ landing — 70", "authoritative": "50 in the first round; only 2 remained in the second round 2026/27" },
+    { "topic": "troškovi upisa", "stale_source": "vesti/14450 (2021) — 2.000 RSD", "authoritative": "3.000 RSD" },
+    { "topic": "whole page", "stale_source": "www.pmf.kg.ac.rs/?id=52 — the entire 2023/24 competition, still live at HTTP 200 and still indexed by Google", "authoritative": "?id=1409 and ?id=1716", "action": "DENYLIST" },
+    { "topic": "prijemni 2023 matematika", "stale_source": "/upis-studije/482 links a file named 'prijemni 2023 - informatika resenja.pdf' under the anchor 'Matematika'", "authoritative": "pub/328f55f2e47f04e5d5f476d5632d0d5d_10312023_071234/prijemni 2023 - matematika sa resenjima.pdf via ?id=1295" },
+    { "topic": "kvote 2026/27", "note": "BOTH are correct — disambiguate by round. First round: Matematika 50, Informatika 50. Second round: Matematika 40, Informatika 2." }
+  ],
+
+  "gaps": {
+    "note": "Topics students ask about that have NO page anywhere on these sites. The chatbot should answer with a pointer to a human rather than hallucinate.",
+    "items": [
+      { "topic": "who teaches course X", "detail": "staff profiles do NOT list courses. Only source is the instructor names inside the timetable at /raspored_pdf/." },
+      { "topic": "consultation / office hours per professor", "detail": "not published anywhere on the site" },
+      { "topic": "office / cabinet number per professor", "detail": "not published anywhere" },
+      { "topic": "studentska kartica / legitimacija", "detail": "no page exists. The functional equivalent at PMF is the index + 2x ŠV-20 issued by Studentska služba." },
+      { "topic": "dorm and canteen prices", "detail": "not published as structured data even on studentskicentar-kg.rs" },
+      { "topic": "žalba na rang listu (appeals)", "detail": "no web page documents the appeal window for OAS; likely only inside konkurs2026.pdf" },
+      { "topic": "obnova godine / overa semestra", "detail": "no dedicated page — only inside pravilnikostudijima2026.pdf" },
+      { "topic": "kupovina udžbenika / skriptarnica", "detail": "no page. ?id=1293 covers publishing but explicitly gives no purchase info." },
+      { "topic": "student ombudsman", "detail": "no page at faculty or university level" },
+      { "topic": "English-language content", "detail": "neither site has a working English version. The EN flag on www.pmf.kg.ac.rs is broken (/en/ 404s, ?lang=en serves Serbian). Nearest English source is en.kg.ac.rs. Your bot must GENERATE English answers, it cannot retrieve them." }
+    ]
+  }
+}
