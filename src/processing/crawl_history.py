@@ -43,7 +43,12 @@ class CrawlHistoryManager:
           "https://imi.pmf.kg.ac.rs/matematika-studije": {
             "type": "html",
             "chunks": 12,
-            "ingested_at": 1712345678.123
+            "ingested_at": 1712345678.123,
+            "context": "Stranica opisuje studijski program matematike.",
+            "questions": [
+              "Koji su predmeti na smeru matematika?",
+              "Kakvi su uslovi za upis?"
+            ]
           },
           ...
         }
@@ -88,17 +93,49 @@ class CrawlHistoryManager:
         """Total number of URLs in the history."""
         return len(self._data.get("urls", {}))
 
+    def get_entry(self, url: str) -> dict[str, Any]:
+        """Return the stored entry for a URL (empty dict if unknown)."""
+        return self._data.get("urls", {}).get(url, {})
+
     # ------------------------------------------------------------------ #
     #  Mutate                                                               #
     # ------------------------------------------------------------------ #
 
-    def mark_ingested(self, url: str, url_type: str, num_chunks: int = 0) -> None:
-        """Record a URL as successfully ingested."""
-        self._data.setdefault("urls", {})[url] = {
+    def mark_ingested(
+        self,
+        url: str,
+        url_type: str,
+        num_chunks: int = 0,
+        context: str | None = None,
+        questions: list[str] | None = None,
+    ) -> None:
+        """Record a URL as successfully ingested, optionally with the
+        generated context summary and questions."""
+        entry: dict[str, Any] = {
             "type": url_type,
             "chunks": num_chunks,
             "ingested_at": time.time(),
         }
+        if context:
+            entry["context"] = context
+        if questions:
+            entry["questions"] = list(questions)
+        self._data.setdefault("urls", {})[url] = entry
+
+    def set_context(
+        self,
+        url: str,
+        context: str | None,
+        questions: list[str] | None,
+    ) -> None:
+        """Attach generated context/questions to an existing entry."""
+        entry = self._data.get("urls", {}).get(url)
+        if entry is None:
+            return
+        if context:
+            entry["context"] = context
+        if questions:
+            entry["questions"] = list(questions)
 
     def clear(self) -> None:
         """Remove all history entries (forces a full re-crawl next run)."""

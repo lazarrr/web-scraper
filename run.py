@@ -10,7 +10,8 @@ This script:
   2. Crawls https://imi.pmf.kg.ac.rs/ for HTML, PDF, and DOCX resources.
   3. Extracts clean text from each resource.
   4. Chunks, embeds (with E5 "passage: " prefix), and upserts into ChromaDB.
-  5. Records which URLs have been ingested in crawl_history.json, so
+  5. Records which URLs have been ingested in crawl_history.json, along
+     with an Ollama-generated context summary and 1-2 questions, so
      subsequent runs skip already-processed pages.
 
 The resulting ChromaDB store is then ready to be read by the
@@ -24,6 +25,7 @@ import os
 from src.core.vector_store import VectorStoreManager
 from src.processing.ingest import IngestionPipeline
 from src.processing.crawl_history import CrawlHistoryManager
+from src.processing.context_generator import ContextGenerator
 from config.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -81,6 +83,20 @@ def main() -> None:
             crawl_history.ingested_count(),
         )
 
+    # ── Context/question generator (Ollama) ────────────────────────── #
+    context_generator: ContextGenerator | None = None
+    if settings.CONTEXT_GENERATION_ENABLED:
+        context_generator = ContextGenerator(
+            base_url=settings.OLLAMA_BASE_URL,
+            model=settings.OLLAMA_MODEL,
+            timeout=settings.OLLAMA_TIMEOUT,
+        )
+        logger.info(
+            "Context generation enabled (Ollama model='%s', url='%s')",
+            settings.OLLAMA_MODEL,
+            settings.OLLAMA_BASE_URL,
+        )
+
     # ── Build and run the pipeline ─────────────────────────────────── #
     pipeline = IngestionPipeline(
         vector_store=vector_store,
@@ -101,6 +117,7 @@ def main() -> None:
             else None
         ),
         crawl_history=crawl_history,
+        context_generator=context_generator,
     )
 
     total = pipeline.ingest_from_url("https://imi.pmf.kg.ac.rs/")

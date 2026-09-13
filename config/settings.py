@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     CRAWL_HISTORY_PATH: str = "./data/crawl_history.json"
 
     # ------------------------------------------------------------------ #
+    #  Context & question generation (Ollama)                              #
+    # ------------------------------------------------------------------ #
+    CONTEXT_GENERATION_ENABLED: bool = True
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:7b-instruct-q4_K_M"
+    OLLAMA_TIMEOUT: int = 120
+
+    # ------------------------------------------------------------------ #
     #  URL filtering                                                       #
     # ------------------------------------------------------------------ #
     CRAWLER_FILTER_MODE: str = "include"

@@ -23,6 +23,7 @@ from src.core.chunking import make_splitter
 from src.processing.crawler import DomainCrawler, CrawledURL
 from src.processing.extractor import ResourceExtractor
 from src.processing.crawl_history import CrawlHistoryManager
+from src.processing.context_generator import ContextGenerator
 
 
 class IngestionPipeline:
@@ -42,6 +43,7 @@ class IngestionPipeline:
         crawler_include_patterns: list[str] | None = None,
         crawler_exclude_patterns: list[str] | None = None,
         crawl_history: CrawlHistoryManager | None = None,
+        context_generator: ContextGenerator | None = None,
     ):
         self.vector_store = vector_store
         self.chunk_size = chunk_size
@@ -53,6 +55,7 @@ class IngestionPipeline:
         self.crawler_include_patterns = crawler_include_patterns
         self.crawler_exclude_patterns = crawler_exclude_patterns
         self.crawl_history = crawl_history
+        self.context_generator = context_generator
 
         self._splitter = make_splitter(
             strategy=chunk_strategy,
@@ -93,11 +96,17 @@ class IngestionPipeline:
         # -- Filter out already-ingested URLs -------------------------- #
         skipped_already: list[CrawledURL] = []
         new_urls: list[CrawledURL] = []
+        needs_enrichment: list[CrawledURL] = []
         if self.crawl_history:
             self.crawl_history.load()
             for r in extractable:
                 if self.crawl_history.is_ingested(r.url):
                     skipped_already.append(r)
+                    entry = self.crawl_history.get_entry(r.url)
+                    if self.context_generator and not (
+                        entry.get("context") and entry.get("questions")
+                    ):
+                        needs_enrichment.append(r)
                 else:
                     new_urls.append(r)
             if skipped_already:
@@ -106,7 +115,7 @@ class IngestionPipeline:
         else:
             new_urls = extractable
 
-        if not new_urls:
+        if not new_urls and not needs_enrichment:
             print("All URLs already ingested -- nothing to do.")
             return 0
 
@@ -137,15 +146,50 @@ class IngestionPipeline:
                 self._upsert_chunks(chunks)
                 total_chunks += len(chunks)
 
+            # Generate context + questions for the history entry
+            context, questions = self._generate_context(crawled.url, text, meta)
+
             # Mark as ingested so we skip it next run
             if self.crawl_history:
                 self.crawl_history.mark_ingested(
-                    crawled.url, crawled.type, num_chunks=len(chunks) if chunks else 0
+                    crawled.url,
+                    crawled.type,
+                    num_chunks=len(chunks) if chunks else 0,
+                    context=context,
+                    questions=questions,
                 )
 
             # Politeness between extraction requests too
             if self.delay > 0 and i < len(new_urls):
                 time.sleep(self.delay)
+
+        # -- Step 3: Backfill context/questions for older entries ------ #
+        if needs_enrichment:
+            print(f"\n=== Generating context/questions for "
+                  f"{len(needs_enrichment)} existing URLs ===")
+            for i, crawled in enumerate(needs_enrichment, start=1):
+                print(f"\n[{i}/{len(needs_enrichment)}] "
+                      f"{crawled.type.upper()} {crawled.url}")
+
+                extracted = extractor.extract(crawled.url, crawled.type)
+                if extracted is None:
+                    continue
+
+                text, meta = extracted
+                if not text.strip():
+                    continue
+
+                context, questions = self._generate_context(
+                    crawled.url, text, meta
+                )
+                if context or questions:
+                    self.crawl_history.set_context(
+                        crawled.url, context, questions
+                    )
+                    print("  -> context/questions saved to crawl history")
+
+                if self.delay > 0 and i < len(needs_enrichment):
+                    time.sleep(self.delay)
 
         # -- Save crawl history ---------------------------------------- #
         if self.crawl_history:
@@ -205,3 +249,26 @@ class IngestionPipeline:
     def _upsert_chunks(self, chunks: list[LCDocument]) -> None:
         """Add chunks to the vector store using the existing add_documents API."""
         self.vector_store.add_documents(chunks)
+
+    # ------------------------------------------------------------------ #
+    #  Context/question generation helper                                 #
+    # ------------------------------------------------------------------ #
+
+    def _generate_context(
+        self, url: str, text: str, meta: dict
+    ) -> tuple[str | None, list[str] | None]:
+        """Generate a short context summary and questions for a page.
+
+        Returns (None, None) when generation is disabled, the page has no
+        text, or Ollama is unreachable — ingestion is never blocked.
+        """
+        if self.context_generator is None or not text.strip():
+            return None, None
+
+        print("  -> generating context/questions with Ollama ...")
+        result = self.context_generator.generate(
+            url, text, title=meta.get("filename")
+        )
+        if not result:
+            return None, None
+        return result.get("context"), result.get("questions")

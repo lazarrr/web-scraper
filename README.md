@@ -21,6 +21,13 @@ Already-ingested URLs are tracked in `data/crawl_history.json` and
 skipped on subsequent runs (set `CRAWL_HISTORY_ENABLED=false` to
 force a full re-crawl).
 
+For every URL the scraper also asks a local **Ollama** model to write a
+short context summary and 1-2 questions the page can answer.  These are
+stored alongside `type`, `chunks`, and `ingested_at` in
+`crawl_history.json`.  Entries created before this feature was enabled
+are backfilled automatically on the next run.  Set
+`CONTEXT_GENERATION_ENABLED=false` to turn this off.
+
 ## How it connects to university-chatbot
 
 The scraper writes to a ChromaDB **persist directory** (default:
@@ -60,6 +67,9 @@ environment variables or a `.env` file.  Key settings:
 | `CHUNK_SIZE` | `1000` | Character chunk size |
 | `CHUNK_OVERLAP` | `200` | Character overlap between chunks |
 | `CRAWL_HISTORY_ENABLED` | `true` | Skip already-ingested URLs |
+| `CONTEXT_GENERATION_ENABLED` | `true` | Generate context + questions per URL via Ollama |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server address |
+| `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | Ollama model used for generation |
 
 ## Running the search server (API for the Flutter app)
 

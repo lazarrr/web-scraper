@@ -27,14 +27,26 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 # --------------------------------------------------------------------------- #
 
 _SENTENCE_RE = re.compile(
-    r"(?<=[.!?\u2026\u203C\u2047-\u2049])\s+(?=\p{Lu})",
+    r"(?<=[.!?\u2026\u203C\u2047-\u2049])\s+",
     re.UNICODE,
 )
 
 
 def _split_sentences(text: str) -> list[str]:
-    """Split text into sentences using a unicode-aware regex."""
-    parts = _SENTENCE_RE.split(text)
+    """Split text into sentences using a unicode-aware regex.
+
+    Python's ``re`` has no ``\\p{Lu}`` property escape, so sentence
+    boundaries are confirmed by checking that the next character is
+    uppercase with ``str.isupper()``.
+    """
+    parts: list[str] = []
+    start = 0
+    for match in _SENTENCE_RE.finditer(text):
+        next_char = text[match.end() : match.end() + 1]
+        if next_char and next_char.isupper():
+            parts.append(text[start : match.start()])
+            start = match.end()
+    parts.append(text[start:])
     return [s.strip() for s in parts if s.strip()]
 
 

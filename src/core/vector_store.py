@@ -206,7 +206,16 @@ class VectorStoreManager:
         if metadata is None:
             metadata = [doc.metadata for doc in documents]
 
-        ids = [self._content_id(t) for t in texts]
+        # Content-hash IDs are stable across runs (idempotent upsert), but
+        # identical chunks inside one batch would collide.  Suffix repeats
+        # with an occurrence counter so every ID in the batch is unique.
+        seen: dict[str, int] = {}
+        ids: list[str] = []
+        for t in texts:
+            base = self._content_id(t)
+            count = seen.get(base, 0)
+            seen[base] = count + 1
+            ids.append(base if count == 0 else f"{base}-{count}")
 
         collection.upsert(
             embeddings=embeddings.tolist(),
